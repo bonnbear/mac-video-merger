@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; overflow: hidden;">
+<canvas id="canvas" width="1024" height="1024"></canvas>
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  const width = 1024;
+  const height = 1024;
+  
+  // 漸變背景
+  const grd = ctx.createLinearGradient(0, 0, 0, height);
+  grd.addColorStop(0, "#30cfd0");
+  grd.addColorStop(1, "#330867");
+  
+  ctx.fillStyle = grd;
+  
+  // 繪製圓角矩形 (模擬 macOS 圖示形狀)
+  // 留一點邊距，防止被系統裁切太狠
+  const margin = 50;
+  const w = width - margin * 2;
+  const h = height - margin * 2;
+  const radius = 180;
+  
+  ctx.beginPath();
+  ctx.roundRect(margin, margin, w, h, radius);
+  ctx.fill();
+  
+  // 添加一個邊框效果
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+  ctx.lineWidth = 20;
+  ctx.stroke();
+  
+  // 文字
+  ctx.fillStyle = "white";
+  ctx.font = "bold 400px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  // 微調文字位置
+  ctx.fillText("VM", width/2, height/2 + 20);
+  
+  // 添加一點文字陰影
+  ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetX = 10;
+  ctx.shadowOffsetY = 10;
+  ctx.fillText("VM", width/2, height/2 + 20);
+</script>
+</body>
+</html>
