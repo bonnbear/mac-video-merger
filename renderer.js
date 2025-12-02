@@ -6,8 +6,11 @@ const resolutionSelect = document.getElementById('resolution');
 const progressContainer = document.getElementById('progressContainer');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
+const appContainer = document.querySelector('.app-container');
+const openFolderBtn = document.getElementById('openFolderBtn');
 
 let fileQueue = []; // { path, name, hasAudio }
+let lastSavedPath = null; // 记录最后保存的文件路径
 
 // 更新文件列表 UI
 function updateList() {
@@ -74,6 +77,7 @@ function showStatus(type, msg) {
 
 function hideStatus() {
     statusEl.style.display = 'none';
+    openFolderBtn.style.display = 'none'; // 隐藏打开文件夹按钮
 }
 
 // 显示/隐藏进度条
@@ -95,28 +99,94 @@ window.api.onProgress((percent) => {
     updateProgress(percent);
 });
 
-// 添加文件
-addBtn.addEventListener('click', async () => {
-    const files = await window.api.selectFiles();
-    if (!files || files.length === 0) return;
+// 处理文件添加逻辑
+async function addFiles(filePaths) {
+    if (!filePaths || filePaths.length === 0) return;
     
-    // 获取每个文件的信息
-    for (const filePath of files) {
+    const validExtensions = ['mp4', 'mov', 'mkv', 'avi', 'flv', 'm4v', 'webm'];
+    let addedCount = 0;
+
+    for (const filePath of filePaths) {
         // 检查是否已存在
         if (fileQueue.some(f => f.path === filePath)) continue;
         
+        // 检查扩展名 (针对拖拽)
+        const ext = filePath.split('.').pop().toLowerCase();
+        if (!validExtensions.includes(ext)) continue;
+
         const fileName = filePath.split(/[/\\]/).pop();
-        const info = await window.api.getVideoInfo(filePath);
         
-        fileQueue.push({
-            path: filePath,
-            name: fileName,
-            hasAudio: info.hasAudio
-        });
+        try {
+            const info = await window.api.getVideoInfo(filePath);
+            
+            fileQueue.push({
+                path: filePath,
+                name: fileName,
+                hasAudio: info.hasAudio
+            });
+            addedCount++;
+        } catch (err) {
+            console.error(`无法获取视频信息: ${filePath}`, err);
+        }
     }
     
-    updateList();
-    hideStatus();
+    if (addedCount > 0) {
+        updateList();
+        hideStatus();
+    }
+}
+
+// 按钮点击添加
+addBtn.addEventListener('click', async () => {
+    const files = await window.api.selectFiles();
+    await addFiles(files);
+});
+
+// 拖拽支持
+let dragCounter = 0;
+
+document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter++;
+    appContainer.classList.add('drag-over');
+});
+
+document.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter--;
+    if (dragCounter === 0) {
+        appContainer.classList.remove('drag-over');
+    }
+});
+
+document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter = 0;
+    appContainer.classList.remove('drag-over');
+
+    const files = [];
+    if (e.dataTransfer.files) {
+        for (const file of e.dataTransfer.files) {
+            // 使用 preload 暴露的 webUtils.getPathForFile 获取路径
+            // 这是 Electron 新版本中获取拖拽文件路径的正确方式
+            const path = window.api.getFilePath(file);
+            if (path) {
+                files.push(path);
+            }
+        }
+    }
+    
+    if (files.length > 0) {
+        await addFiles(files);
+    }
 });
 
 // 合并逻辑
@@ -132,6 +202,7 @@ mergeBtn.addEventListener('click', async () => {
     mergeBtn.textContent = '⏳ 处理中...';
     showProgress(true);
     showStatus('processing', '正在利用 M4 硬件加速合并视频...');
+    openFolderBtn.style.display = 'none'; // 隐藏按钮
 
     try {
         await window.api.mergeVideos({
@@ -140,8 +211,10 @@ mergeBtn.addEventListener('click', async () => {
             resolution: resolutionSelect.value
         });
         
+        lastSavedPath = savePath; // 记录保存路径
         showProgress(false);
         showStatus('success', '✅ 合并成功！视频已保存。');
+        openFolderBtn.style.display = 'block'; // 显示按钮
     } catch (err) {
         showProgress(false);
         showStatus('error', '❌ 合并失败: ' + err);
@@ -152,5 +225,29 @@ mergeBtn.addEventListener('click', async () => {
     }
 });
 
+// 打开文件夹按钮逻辑
+openFolderBtn.addEventListener('click', () => {
+    if (lastSavedPath) {
+        window.api.showItemInFolder(lastSavedPath);
+    }
+});
+
 // 初始化
 updateList();
+// 缩放控制
+document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey) {
+        if (e.key === '=' || e.key === '+') {
+            e.preventDefault();
+            const currentZoom = window.api.getZoomLevel();
+            window.api.setZoomLevel(currentZoom + 0.5);
+        } else if (e.key === '-') {
+            e.preventDefault();
+            const currentZoom = window.api.getZoomLevel();
+            window.api.setZoomLevel(currentZoom - 0.5);
+        } else if (e.key === '0') {
+            e.preventDefault();
+            window.api.setZoomLevel(0);
+        }
+    }
+});

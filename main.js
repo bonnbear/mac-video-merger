@@ -1,35 +1,64 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const { spawn, execSync } = require('child_process');
 
-// --- 获取 FFmpeg 路径 ---
-const getFfmpegPath = () => {
-    // 优先尝试使用系统安装的 FFmpeg 以支持硬件加速
-    try {
-        // 尝试查找系统 ffmpeg 路径
-        const systemFfmpeg = execSync('which ffmpeg').toString().trim();
-        if (systemFfmpeg) {
-            console.log('使用系统 FFmpeg:', systemFfmpeg);
-            return systemFfmpeg;
+// --- 获取 FFmpeg/FFprobe 路径 ---
+const getBinaryPath = (binaryName) => {
+    // 1. 定义常见的安装路径 (macOS Homebrew, MacPorts, etc.)
+    const commonPaths = [
+        `/opt/homebrew/bin/${binaryName}`, // Apple Silicon Homebrew
+        `/usr/local/bin/${binaryName}`,    // Intel Mac Homebrew
+        `/usr/bin/${binaryName}`,
+        `/bin/${binaryName}`
+    ];
+
+    // 2. 遍历检查文件是否存在
+    for (const p of commonPaths) {
+        try {
+            if (fs.existsSync(p)) {
+                console.log(`[Main] Found ${binaryName} at: ${p}`);
+                return p;
+            }
+        } catch (e) {
+            console.error(`[Main] Error checking path ${p}:`, e);
         }
-    } catch (e) {
-        console.log('未找到系统 FFmpeg');
     }
 
-    // 如果找不到系统 FFmpeg，这里可以添加备用逻辑，
-    // 比如提示用户安装，或者回退到其他方案。
-    // 目前假设用户已经安装了系统 FFmpeg。
-    return 'ffmpeg'; 
+    // 3. 尝试使用系统 which 命令 (作为备选，虽然在 GUI 环境下 PATH 可能不全)
+    try {
+        const systemPath = execSync(`which ${binaryName}`).toString().trim();
+        if (systemPath) {
+            console.log(`[Main] Found ${binaryName} using which: ${systemPath}`);
+            return systemPath;
+        }
+    } catch (e) {
+        console.log(`[Main] 'which ${binaryName}' failed or not found`);
+    }
+
+    // 4. 如果都找不到，回退到默认命令名，寄希望于系统 PATH (但在 GUI App 中可能失败)
+    console.warn(`[Main] Could not find absolute path for ${binaryName}, falling back to command name.`);
+    return binaryName;
 };
 
-ffmpeg.setFfmpegPath(getFfmpegPath());
+// 设置 FFmpeg 和 FFprobe 路径
+const ffmpegPath = getBinaryPath('ffmpeg');
+const ffprobePath = getBinaryPath('ffprobe');
+
+ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
+
+console.log('FFmpeg config:', { ffmpeg: ffmpegPath, ffprobe: ffprobePath });
 
 // --- 检测视频是否有音轨 ---
 function probeVideo(filePath) {
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(filePath, (err, metadata) => {
-            if (err) return reject(err);
+            if (err) {
+                console.error('ffprobe error:', err);
+                return reject(err);
+            }
             
             const hasAudio = metadata.streams.some(s => s.codec_type === 'audio');
             const videoStream = metadata.streams.find(s => s.codec_type === 'video');
@@ -103,8 +132,13 @@ ipcMain.handle('get-video-info', async (event, filePath) => {
     try {
         return await probeVideo(filePath);
     } catch (err) {
+        console.error('get-video-info error:', err);
         return { hasAudio: true, width: 1920, height: 1080 };
     }
+});
+// 打开文件所在文件夹
+ipcMain.handle('show-item-in-folder', (event, filePath) => {
+    shell.showItemInFolder(filePath);
 });
 
 // 执行合并 (M4 优化版)

@@ -23,25 +23,37 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
             background: linear-gradient(180deg, #f5f5f7 0%, #e8e8ed 100%);
-            min-height: 100vh;
+            height: 100vh;
             padding: 20px;
             color: #1c1c1e;
             -webkit-user-select: none;
             user-select: none;
+            -webkit-app-region: drag;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         
         .app-container {
-            max-width: 650px;
+            width: 100%;
+            max-width: 900px;
             margin: 0 auto;
             background: var(--card);
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            -webkit-app-region: no-drag;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
         }
         
         .header {
             text-align: center;
             margin-bottom: 24px;
+            -webkit-app-region: drag;
+            flex-shrink: 0;
         }
         
         h1 {
@@ -79,6 +91,8 @@
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
+            -webkit-app-region: no-drag;
+            flex-shrink: 0;
         }
         
         .btn:hover:not(:disabled) {
@@ -112,6 +126,7 @@
             display: flex;
             gap: 12px;
             margin: 16px 0;
+            flex-shrink: 0;
         }
         
         .option-group {
@@ -133,6 +148,7 @@
             font-size: 14px;
             background: white;
             cursor: pointer;
+            -webkit-app-region: no-drag;
         }
         
         .file-list {
@@ -140,11 +156,12 @@
             padding: 0;
             background: #f9f9fb;
             border-radius: 12px;
-            min-height: 120px;
-            max-height: 320px;
+            min-height: 100px;
             overflow-y: auto;
             list-style: none;
             border: 1px solid #e5e5ea;
+            -webkit-app-region: no-drag;
+            flex: 1;
         }
         
         .file-list:empty::before {
@@ -152,9 +169,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 120px;
+            height: 100%;
             color: #86868b;
             font-size: 14px;
+            min-height: 100px;
         }
         
         .file-item {
@@ -215,6 +233,7 @@
             cursor: pointer;
             font-size: 14px;
             transition: background 0.15s;
+            -webkit-app-region: no-drag;
         }
         
         .file-actions button:hover {
@@ -229,6 +248,7 @@
         .progress-container {
             margin-top: 20px;
             display: none;
+            flex-shrink: 0;
         }
         
         .progress-bar {
@@ -260,6 +280,7 @@
             text-align: center;
             font-size: 14px;
             display: none;
+            flex-shrink: 0;
         }
         
         .status-processing {
@@ -284,11 +305,18 @@
             border-radius: 10px;
             font-size: 13px;
             color: #8a6d00;
+            flex-shrink: 0;
         }
         
         .tips strong {
             display: block;
             margin-bottom: 4px;
+        }
+        .app-container.drag-over {
+            border: 2px dashed var(--primary);
+            background-color: rgba(0, 122, 255, 0.05);
+            transform: scale(1.01);
+            transition: all 0.2s ease;
         }
     </style>
 </head>
@@ -327,6 +355,7 @@
         </div>
 
         <div id="status"></div>
+        <button id="openFolderBtn" class="btn btn-secondary" style="display: none; margin-top: 10px;">📂 打开输出目录</button>
         
         <div class="tips">
             <strong>💡 提示</strong>
